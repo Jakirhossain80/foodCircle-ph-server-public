@@ -103,6 +103,21 @@ app.post("/foods", async (req, res) => {
   }
 });
 
+app.get("/featured-foods", async (req, res) => {
+  try {
+    const topFoods = await foodCollection
+      .find({ foodStatus: "Available" })
+      .sort({ quantity: -1 })
+      .limit(6)
+      .toArray();
+
+    res.json(topFoods);
+  } catch (err) {
+    console.error("Error fetching featured foods:", err);
+    res.status(500).json({ error: "Failed to fetch featured foods" });
+  }
+});
+
 // Default route
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 
