@@ -149,6 +149,29 @@ app.get("/available-foods", async (req, res) => {
   }
 });
 
+// Get single food item by ID
+app.get("/food/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid food ID" });
+    }
+
+    const food = await foodCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!food) {
+      return res.status(404).json({ error: "Food item not found" });
+    }
+
+    res.json(food);
+  } catch (err) {
+    console.error("Error fetching food by ID:", err);
+    res.status(500).json({ error: "Failed to fetch food item" });
+  }
+});
+
+
 
 // Default route
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
