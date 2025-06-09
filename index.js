@@ -118,6 +118,38 @@ app.get("/featured-foods", async (req, res) => {
   }
 });
 
+app.get("/available-foods", async (req, res) => {
+  try {
+    const { search, sort } = req.query;
+
+    const query = { foodStatus: "Available" };
+
+    // If search term exists, use case-insensitive regex for foodName
+    if (search) {
+      query.foodName = { $regex: search, $options: "i" };
+    }
+
+    // Sort option: "asc" or "desc" on expireAt
+    const sortOptions = {};
+    if (sort === "asc") {
+      sortOptions.expireAt = 1;
+    } else if (sort === "desc") {
+      sortOptions.expireAt = -1;
+    }
+
+    const foods = await foodCollection
+      .find(query)
+      .sort(sortOptions)
+      .toArray();
+
+    res.json(foods);
+  } catch (err) {
+    console.error("Error fetching available foods:", err);
+    res.status(500).json({ error: "Failed to fetch available foods" });
+  }
+});
+
+
 // Default route
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 
