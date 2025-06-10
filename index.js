@@ -38,6 +38,7 @@ const client = new MongoClient(uri, {
 });
 
 let foodCollection;
+let requestCollection;
 
 // MongoDB connection function
 async function run() {
@@ -45,6 +46,7 @@ async function run() {
     await client.connect();
     const db = client.db(process.env.MONGODB_DB);
     foodCollection = db.collection("foodCollection");
+    requestCollection = db.collection("requestCollection");
     console.log("✅ Connected to MongoDB");
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
