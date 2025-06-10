@@ -173,6 +173,48 @@ app.get("/food/:id", async (req, res) => {
 
 
 
+app.put("/foods/request/:id", async (req, res) => {
+  const { id } = req.params;
+  const updateFields = req.body;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
+  try {
+    const result = await foodCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { foodStatus: "requested" } }
+    );
+
+    res.json({ success: result.modifiedCount > 0 });
+  } catch (err) {
+    console.error("Error updating food:", err);
+    res.status(500).json({ error: "Failed to update food status" });
+  }
+});
+
+app.post("/requests", async (req, res) => {
+  try {
+    const requestData = req.body;
+
+    const result = await requestCollection.insertOne({
+      ...requestData,
+      createdAt: new Date(),
+    });
+
+    res.status(201).json({ insertedId: result.insertedId });
+  } catch (err) {
+    console.error("Error saving request:", err);
+    res.status(500).json({ error: "Failed to save request" });
+  }
+});
+
+
+
+
+
+
 // Default route
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 
