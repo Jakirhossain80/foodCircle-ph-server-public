@@ -210,6 +210,23 @@ app.post("/requests", async (req, res) => {
   }
 });
 
+app.get("/requests", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  try {
+    const myRequests = await requestCollection
+      .find({ requesterEmail: email })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.json(myRequests);
+  } catch (err) {
+    console.error("Error fetching requests:", err);
+    res.status(500).json({ error: "Failed to fetch requests" });
+  }
+});
 
 
 
