@@ -58,7 +58,9 @@ run().catch(console.dir);
 // Middleware to block requests if DB not ready
 app.use((req, res, next) => {
   if (!foodCollection) {
-    return res.status(503).send("Server is not ready. Please try again shortly.");
+    return res
+      .status(503)
+      .send("Server is not ready. Please try again shortly.");
   }
   next();
 });
@@ -79,7 +81,14 @@ app.post("/foods", async (req, res) => {
     } = req.body;
 
     // Basic required field validation
-    if (!foodName || !quantity || !location || !expireAt || !userName || !userEmail) {
+    if (
+      !foodName ||
+      !quantity ||
+      !location ||
+      !expireAt ||
+      !userName ||
+      !userEmail
+    ) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -139,10 +148,7 @@ app.get("/available-foods", async (req, res) => {
       sortOptions.expireAt = -1;
     }
 
-    const foods = await foodCollection
-      .find(query)
-      .sort(sortOptions)
-      .toArray();
+    const foods = await foodCollection.find(query).sort(sortOptions).toArray();
 
     res.json(foods);
   } catch (err) {
@@ -172,8 +178,6 @@ app.get("/food/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch food item" });
   }
 });
-
-
 
 app.put("/foods/request/:id", async (req, res) => {
   const { id } = req.params;
@@ -235,7 +239,9 @@ app.get("/myfoods", async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
-    return res.status(400).json({ error: "Email is required to fetch user-specific foods" });
+    return res
+      .status(400)
+      .json({ error: "Email is required to fetch user-specific foods" });
   }
 
   try {
@@ -251,8 +257,64 @@ app.get("/myfoods", async (req, res) => {
   }
 });
 
+app.delete("/food/:id", async (req, res) => {
+  const { id } = req.params;
 
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
 
+  try {
+    const result = await foodCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Food item not found or already deleted" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting food:", err);
+    res.status(500).json({ error: "Failed to delete food item" });
+  }
+});
+
+app.put("/food/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
+  const updateData = req.body;
+
+  // 🛠️ Convert 'expireAt' string to a Date
+  if (updateData.expireAt) {
+    updateData.expireAt = new Date(updateData.expireAt);
+    if (isNaN(updateData.expireAt)) {
+      return res.status(400).json({ error: "Invalid expiration date format" });
+    }
+  }
+
+  try {
+    const result = await foodCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "No document updated. It may not exist." });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating food:", err);
+    res.status(500).json({ error: "Failed to update food" });
+  }
+});
 
 // Default route
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
@@ -261,4 +323,3 @@ app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
-
