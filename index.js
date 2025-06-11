@@ -219,7 +219,7 @@ app.get("/requests", async (req, res) => {
 
   try {
     const myRequests = await requestCollection
-      .find({ requesterEmail: email })
+      .find({ userEmail: email })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -230,6 +230,26 @@ app.get("/requests", async (req, res) => {
   }
 });
 
+// GET foods by user email (for ManageMyFoods)
+app.get("/myfoods", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required to fetch user-specific foods" });
+  }
+
+  try {
+    const myFoods = await foodCollection
+      .find({ donorEmail: email })
+      .sort({ createdAt: -1 }) // Optional: show newest first
+      .toArray();
+
+    res.json(myFoods);
+  } catch (err) {
+    console.error("Error fetching user-specific foods:", err);
+    res.status(500).json({ error: "Failed to fetch your foods" });
+  }
+});
 
 
 
