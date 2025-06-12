@@ -1,10 +1,23 @@
 const express = require("express");
-const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const serverless = require("serverless-http");  // serverless wrapper
+const serverless = require("serverless-http");
 require("dotenv").config();
 
 const app = express();
+
+// ✅ Manual CORS Middleware — safest for Vercel serverless
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://foodcircle-ph-eleven.netlify.app");
+  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+app.use(express.json());
 
 const requiredEnvVars = [
   "MONGODB_USER",
@@ -20,22 +33,6 @@ for (const key of requiredEnvVars) {
     process.exit(1);
   }
 }
-
-
-app.use(express.json());
-app.use(cors({
-  origin: 'https://foodcircle-ph-eleven.netlify.app',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  allowedHeaders: ['Content-Type'],
-}));
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://foodcircle-ph-eleven.netlify.app');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  next();
-});
-
 
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
 
@@ -67,6 +64,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// ✅ Routes
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 
 app.post("/foods", async (req, res) => {
@@ -213,5 +211,5 @@ app.put("/food/:id", async (req, res) => {
   }
 });
 
-// Export for serverless
+// ✅ Export for Vercel Serverless
 module.exports = serverless(app);
