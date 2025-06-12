@@ -1,26 +1,12 @@
 const express = require("express");
+const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const serverless = require("serverless-http");
 require("dotenv").config();
 
 const app = express();
+const port = process.env.PORT || 3000;
 
-// ✅ Manual CORS for Vercel serverless
-const allowedOrigin = "https://foodcircle-ph-eleven.netlify.app";
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", allowedOrigin);
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
-
-app.use(express.json());
-
-// ✅ Environment validation
+// Check for essential environment variables
 const requiredEnvVars = [
   "MONGODB_USER",
   "MONGODB_PASS",
@@ -28,6 +14,7 @@ const requiredEnvVars = [
   "MONGODB_DB",
   "MONGODB_APP_NAME",
 ];
+
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     console.error(`❌ Missing required environment variable: ${key}`);
@@ -35,18 +22,28 @@ for (const key of requiredEnvVars) {
   }
 }
 
-// ✅ MongoDB connection
+app.use(cors());
+app.use(express.json());
+
+// MongoDB connection URI
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
+
+// MongoClient setup
 const client = new MongoClient(uri, {
-  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true }
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
 let foodCollection;
 let requestCollection;
 
+// MongoDB connection function
 async function run() {
   try {
-    await client.connect();
+    //await client.connect();
     const db = client.db(process.env.MONGODB_DB);
     foodCollection = db.collection("foodCollection");
     requestCollection = db.collection("requestCollection");
@@ -55,26 +52,46 @@ async function run() {
     console.error("❌ MongoDB connection error:", err);
   }
 }
+
 run().catch(console.dir);
 
-// ✅ MongoDB readiness check middleware
+// Middleware to block requests if DB not ready
 app.use((req, res, next) => {
   if (!foodCollection) {
-    return res.status(503).send("Server is not ready. Please try again shortly.");
+    return res
+      .status(503)
+      .send("Server is not ready. Please try again shortly.");
   }
   next();
 });
 
-// ✅ Routes
-
-app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
-
+// POST endpoint to handle food addition
 app.post("/foods", async (req, res) => {
   try {
-    const { foodName, foodImage, quantity, location, expireAt, note, userName, userEmail, userImage } = req.body;
-    if (!foodName || !quantity || !location || !expireAt || !userName || !userEmail) {
+    const {
+      foodName,
+      foodImage,
+      quantity,
+      location,
+      expireAt,
+      note,
+      userName,
+      userEmail,
+      userImage,
+    } = req.body;
+
+    // Basic required field validation
+    if (
+      !foodName ||
+      !quantity ||
+      !location ||
+      !expireAt ||
+      !userName ||
+      !userEmail
+    ) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+
     const newFood = {
       foodName,
       foodImage: foodImage || "",
@@ -88,6 +105,7 @@ app.post("/foods", async (req, res) => {
       foodStatus: "Available",
       createdAt: new Date(),
     };
+
     const result = await foodCollection.insertOne(newFood);
     res.status(201).json({ insertedId: result.insertedId });
   } catch (err) {
@@ -98,7 +116,12 @@ app.post("/foods", async (req, res) => {
 
 app.get("/featured-foods", async (req, res) => {
   try {
-    const topFoods = await foodCollection.find({ foodStatus: "Available" }).sort({ quantity: -1 }).limit(6).toArray();
+    const topFoods = await foodCollection
+      .find({ foodStatus: "Available" })
+      .sort({ quantity: -1 })
+      .limit(6)
+      .toArray();
+
     res.json(topFoods);
   } catch (err) {
     console.error("Error fetching featured foods:", err);
@@ -109,12 +132,24 @@ app.get("/featured-foods", async (req, res) => {
 app.get("/available-foods", async (req, res) => {
   try {
     const { search, sort } = req.query;
+
     const query = { foodStatus: "Available" };
-    if (search) query.foodName = { $regex: search, $options: "i" };
+
+    // If search term exists, use case-insensitive regex for foodName
+    if (search) {
+      query.foodName = { $regex: search, $options: "i" };
+    }
+
+    // Sort option: "asc" or "desc" on expireAt
     const sortOptions = {};
-    if (sort === "asc") sortOptions.expireAt = 1;
-    else if (sort === "desc") sortOptions.expireAt = -1;
+    if (sort === "asc") {
+      sortOptions.expireAt = 1;
+    } else if (sort === "desc") {
+      sortOptions.expireAt = -1;
+    }
+
     const foods = await foodCollection.find(query).sort(sortOptions).toArray();
+
     res.json(foods);
   } catch (err) {
     console.error("Error fetching available foods:", err);
@@ -122,12 +157,21 @@ app.get("/available-foods", async (req, res) => {
   }
 });
 
+// Get single food item by ID
 app.get("/food/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid food ID" });
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid food ID" });
+    }
+
     const food = await foodCollection.findOne({ _id: new ObjectId(id) });
-    if (!food) return res.status(404).json({ error: "Food item not found" });
+
+    if (!food) {
+      return res.status(404).json({ error: "Food item not found" });
+    }
+
     res.json(food);
   } catch (err) {
     console.error("Error fetching food by ID:", err);
@@ -137,9 +181,18 @@ app.get("/food/:id", async (req, res) => {
 
 app.put("/foods/request/:id", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid food ID" });
+  const updateFields = req.body;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
   try {
-    const result = await foodCollection.updateOne({ _id: new ObjectId(id) }, { $set: { foodStatus: "requested" } });
+    const result = await foodCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { foodStatus: "requested" } }
+    );
+
     res.json({ success: result.modifiedCount > 0 });
   } catch (err) {
     console.error("Error updating food:", err);
@@ -150,7 +203,12 @@ app.put("/foods/request/:id", async (req, res) => {
 app.post("/requests", async (req, res) => {
   try {
     const requestData = req.body;
-    const result = await requestCollection.insertOne({ ...requestData, createdAt: new Date() });
+
+    const result = await requestCollection.insertOne({
+      ...requestData,
+      createdAt: new Date(),
+    });
+
     res.status(201).json({ insertedId: result.insertedId });
   } catch (err) {
     console.error("Error saving request:", err);
@@ -160,9 +218,15 @@ app.post("/requests", async (req, res) => {
 
 app.get("/requests", async (req, res) => {
   const { email } = req.query;
+
   if (!email) return res.status(400).json({ error: "Email is required" });
+
   try {
-    const myRequests = await requestCollection.find({ userEmail: email }).sort({ createdAt: -1 }).toArray();
+    const myRequests = await requestCollection
+      .find({ userEmail: email })
+      .sort({ createdAt: -1 })
+      .toArray();
+
     res.json(myRequests);
   } catch (err) {
     console.error("Error fetching requests:", err);
@@ -170,11 +234,22 @@ app.get("/requests", async (req, res) => {
   }
 });
 
+// GET foods by user email (for ManageMyFoods)
 app.get("/myfoods", async (req, res) => {
   const { email } = req.query;
-  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  if (!email) {
+    return res
+      .status(400)
+      .json({ error: "Email is required to fetch user-specific foods" });
+  }
+
   try {
-    const myFoods = await foodCollection.find({ donorEmail: email }).sort({ createdAt: -1 }).toArray();
+    const myFoods = await foodCollection
+      .find({ donorEmail: email })
+      .sort({ createdAt: -1 }) // Optional: show newest first
+      .toArray();
+
     res.json(myFoods);
   } catch (err) {
     console.error("Error fetching user-specific foods:", err);
@@ -184,10 +259,20 @@ app.get("/myfoods", async (req, res) => {
 
 app.delete("/food/:id", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid food ID" });
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
   try {
     const result = await foodCollection.deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: "Food item not found or already deleted" });
+
+    if (result.deletedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Food item not found or already deleted" });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("Error deleting food:", err);
@@ -197,15 +282,33 @@ app.delete("/food/:id", async (req, res) => {
 
 app.put("/food/:id", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid food ID" });
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
   const updateData = req.body;
+
+  // 🛠️ Convert 'expireAt' string to a Date
   if (updateData.expireAt) {
     updateData.expireAt = new Date(updateData.expireAt);
-    if (isNaN(updateData.expireAt)) return res.status(400).json({ error: "Invalid expiration date format" });
+    if (isNaN(updateData.expireAt)) {
+      return res.status(400).json({ error: "Invalid expiration date format" });
+    }
   }
+
   try {
-    const result = await foodCollection.updateOne({ _id: new ObjectId(id) }, { $set: updateData });
-    if (result.modifiedCount === 0) return res.status(404).json({ error: "No document updated. It may not exist." });
+    const result = await foodCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "No document updated. It may not exist." });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("Error updating food:", err);
@@ -213,5 +316,12 @@ app.put("/food/:id", async (req, res) => {
   }
 });
 
-// ✅ Export for Vercel serverless
-module.exports = serverless(app);
+// Default route
+app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
+
+
