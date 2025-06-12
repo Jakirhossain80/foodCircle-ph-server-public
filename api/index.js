@@ -1,28 +1,22 @@
 const express = require("express");
+const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const serverless = require("serverless-http");
 require("dotenv").config();
 
 const app = express();
 
-// ✅ Manual CORS Middleware — safest for Vercel serverless
-// ✅ Improved CORS Middleware for Netlify Frontend
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://foodcircle-ph-eleven.netlify.app");
-  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
-
+// ✅ CORS middleware for Netlify frontend
+app.use(cors({
+  origin: "https://foodcircle-ph-eleven.netlify.app",
+  credentials: true,
+  methods: "GET,POST,PUT,DELETE,OPTIONS",
+  allowedHeaders: "Origin,X-Requested-With,Content-Type,Accept,Authorization"
+}));
 
 app.use(express.json());
 
+// ✅ Environment validation
 const requiredEnvVars = [
   "MONGODB_USER",
   "MONGODB_PASS",
@@ -38,6 +32,7 @@ for (const key of requiredEnvVars) {
   }
 }
 
+// ✅ MongoDB connection
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
 
 const client = new MongoClient(uri, {
@@ -61,6 +56,7 @@ async function run() {
 
 run().catch(console.dir);
 
+// ✅ MongoDB readiness check
 app.use((req, res, next) => {
   if (!foodCollection) {
     return res.status(503).send("Server is not ready. Please try again shortly.");
