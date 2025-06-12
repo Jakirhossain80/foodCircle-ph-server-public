@@ -21,8 +21,21 @@ for (const key of requiredEnvVars) {
   }
 }
 
-app.use(cors());
+
 app.use(express.json());
+app.use(cors({
+  origin: 'https://foodcircle-ph-eleven.netlify.app',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: ['Content-Type'],
+}));
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://foodcircle-ph-eleven.netlify.app');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  next();
+});
+
 
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
 
