@@ -6,16 +6,20 @@ require("dotenv").config();
 const app = express();
 
 // ✅ Manual CORS Middleware — safest for Vercel serverless
+// ✅ Improved CORS Middleware for Netlify Frontend
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "https://foodcircle-ph-eleven.netlify.app");
-  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  // Handle preflight requests
   if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
+    return res.status(204).end();
   }
   next();
 });
+
 
 app.use(express.json());
 
