@@ -1,18 +1,22 @@
 const express = require("express");
-const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const serverless = require("serverless-http");
 require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS middleware for Netlify frontend
-app.use(cors({
-  origin: "https://foodcircle-ph-eleven.netlify.app",
-  credentials: true,
-  methods: "GET,POST,PUT,DELETE,OPTIONS",
-  allowedHeaders: "Origin,X-Requested-With,Content-Type,Accept,Authorization"
-}));
+// ✅ Manual CORS for Vercel serverless
+const allowedOrigin = "https://foodcircle-ph-eleven.netlify.app";
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", allowedOrigin);
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
 
 app.use(express.json());
 
@@ -24,7 +28,6 @@ const requiredEnvVars = [
   "MONGODB_DB",
   "MONGODB_APP_NAME",
 ];
-
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     console.error(`❌ Missing required environment variable: ${key}`);
@@ -34,7 +37,6 @@ for (const key of requiredEnvVars) {
 
 // ✅ MongoDB connection
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
-
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true }
 });
@@ -53,10 +55,9 @@ async function run() {
     console.error("❌ MongoDB connection error:", err);
   }
 }
-
 run().catch(console.dir);
 
-// ✅ MongoDB readiness check
+// ✅ MongoDB readiness check middleware
 app.use((req, res, next) => {
   if (!foodCollection) {
     return res.status(503).send("Server is not ready. Please try again shortly.");
@@ -65,6 +66,7 @@ app.use((req, res, next) => {
 });
 
 // ✅ Routes
+
 app.get("/", (req, res) => res.send("🍽️ FoodCircle Backend Running"));
 
 app.post("/foods", async (req, res) => {
@@ -211,5 +213,5 @@ app.put("/food/:id", async (req, res) => {
   }
 });
 
-// ✅ Export for Vercel Serverless
+// ✅ Export for Vercel serverless
 module.exports = serverless(app);
