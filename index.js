@@ -238,6 +238,31 @@ app.delete("/food/:id", verifyJWT, async (req, res) => {
   }
 });
 
+app.put("/food/:id", verifyJWT, async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid food ID" });
+  }
+
+  try {
+    const updateData = req.body;
+    const result = await foodCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Food item not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error updating food:", err);
+    res.status(500).json({ error: "Failed to update food" });
+  }
+});
+
+
 app.get("/", (req, res) => {
   res.send("FoodCircle Server is running");
 });
