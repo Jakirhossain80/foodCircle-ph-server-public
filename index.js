@@ -42,6 +42,24 @@ const client = new MongoClient(uri, {
 let foodCollection;
 let requestCollection;
 
+// ✅ Function to normalize incorrect expireAt string fields
+async function normalizeExpireAtField() {
+  const cursor = foodCollection.find({ expireAt: { $type: "string" } });
+
+  for await (const doc of cursor) {
+    const parsedDate = new Date(doc.expireAt);
+    if (!isNaN(parsedDate)) {
+      await foodCollection.updateOne(
+        { _id: doc._id },
+        { $set: { expireAt: parsedDate } }
+      );
+      console.log(`✅ Updated expireAt for food ID: ${doc._id}`);
+    } else {
+      console.warn(`⚠️ Skipped invalid date for food ID: ${doc._id}`);
+    }
+  }
+}
+
 // MongoDB connection function
 async function run() {
   try {
@@ -49,6 +67,9 @@ async function run() {
     foodCollection = db.collection("foodCollection");
     requestCollection = db.collection("requestCollection");
     console.log("✅ Connected to MongoDB");
+
+    // ✅ Normalize incorrect expireAt formats
+    await normalizeExpireAtField();
   } catch (err) {
     console.error("❌ MongoDB connection error:", err);
   }
@@ -128,7 +149,25 @@ app.post("/foods", verifyJWT, async (req, res) => {
 
 app.get("/featured-foods", async (req, res) => {
   try {
-    const topFoods = await foodCollection.find({ foodStatus: "Available" }).sort({ quantity: -1 }).limit(6).toArray();
+    const topFoods = await foodCollection
+      .aggregate([
+        { $match: { foodStatus: "Available" } },
+        {
+          $addFields: {
+            quantityNumeric: {
+              $cond: {
+                if: { $isNumber: "$quantity" },
+                then: "$quantity",
+                else: { $toInt: "$quantity" },
+              },
+            },
+          },
+        },
+        { $sort: { quantityNumeric: -1 } },
+        { $limit: 6 },
+      ])
+      .toArray();
+
     res.json(topFoods);
   } catch (err) {
     console.error("Error fetching featured foods:", err);
@@ -261,7 +300,6 @@ app.put("/food/:id", verifyJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to update food" });
   }
 });
-
 
 app.get("/", (req, res) => {
   res.send("FoodCircle Server is running");
