@@ -24,6 +24,7 @@ for (const key of requiredEnvVars) {
   }
 }
 
+
 app.use(cors());
 app.use(express.json());
 
