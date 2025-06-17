@@ -176,7 +176,6 @@ app.get("/featured-foods", async (req, res) => {
   }
 });
 
-
 app.get("/available-foods", async (req, res) => {
   try {
     const { search, sort } = req.query;
@@ -188,42 +187,13 @@ app.get("/available-foods", async (req, res) => {
     if (sort === "asc") sortOptions.expireAt = 1;
     else if (sort === "desc") sortOptions.expireAt = -1;
 
-    const foods = await foodCollection
-      .aggregate([
-        { $match: query },
-        {
-          $addFields: {
-            expireAt: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: [{ $type: "$expireAt" }, "string"] },
-                    {
-                      $regexMatch: {
-                        input: "$expireAt",
-                        regex: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?Z?$/
-                      }
-                    }
-                  ]
-                },
-                { $toDate: "$expireAt" },
-                "$expireAt"
-              ]
-            }
-          }
-        },
-        { $sort: sortOptions }
-      ])
-      .toArray();
-
+    const foods = await foodCollection.find(query).sort(sortOptions).toArray();
     res.json(foods);
   } catch (err) {
     console.error("Error fetching available foods:", err);
     res.status(500).json({ error: "Failed to fetch available foods" });
   }
 });
-
-
 
 app.get("/food/:id", verifyJWT, async (req, res) => {
   try {
