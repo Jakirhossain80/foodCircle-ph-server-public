@@ -176,6 +176,7 @@ app.get("/featured-foods", async (req, res) => {
   }
 });
 
+
 app.get("/available-foods", async (req, res) => {
   try {
     const { search, sort } = req.query;
@@ -194,7 +195,17 @@ app.get("/available-foods", async (req, res) => {
           $addFields: {
             expireAt: {
               $cond: [
-                { $eq: [{ $type: "$expireAt" }, "string"] },
+                {
+                  $and: [
+                    { $eq: [{ $type: "$expireAt" }, "string"] },
+                    {
+                      $regexMatch: {
+                        input: "$expireAt",
+                        regex: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?Z?$/
+                      }
+                    }
+                  ]
+                },
                 { $toDate: "$expireAt" },
                 "$expireAt"
               ]
@@ -211,6 +222,7 @@ app.get("/available-foods", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch available foods" });
   }
 });
+
 
 
 app.get("/food/:id", verifyJWT, async (req, res) => {
