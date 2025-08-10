@@ -28,6 +28,13 @@ for (const key of requiredEnvVars) {
 app.use(cors());
 app.use(express.json());
 
+app.use(cors({
+  origin: ["https://foodcircle-ph-eleven.netlify.app","http://localhost:5173"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+
 // MongoDB connection URI
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_APP_NAME}`;
 
@@ -64,6 +71,7 @@ async function normalizeExpireAtField() {
 // MongoDB connection function
 async function run() {
   try {
+    await client.connect();
     const db = client.db(process.env.MONGODB_DB);
     foodCollection = db.collection("foodCollection");
     requestCollection = db.collection("requestCollection");
@@ -156,16 +164,33 @@ app.get("/featured-foods", async (req, res) => {
         {
           $addFields: {
             quantityNumeric: {
-              $cond: {
-                if: { $isNumber: "$quantity" },
-                then: "$quantity",
-                else: { $toInt: "$quantity" },
-              },
-            },
-          },
+              $cond: [
+                { $isNumber: "$quantity" },
+                "$quantity",
+                {
+                  $convert: {
+                    input: "$quantity",  // handles "3", "03", "3.5", etc.
+                    to: "double",
+                    onError: 0,          // if "2 kg" or invalid → 0 (no crash)
+                    onNull: 0
+                  }
+                }
+              ]
+            }
+          }
         },
         { $sort: { quantityNumeric: -1 } },
         { $limit: 6 },
+        // Optional: project only what the UI needs (keeps payload lean)
+        {
+          $project: {
+            foodName: 1,
+            foodImage: 1,
+            quantity: 1,
+            location: 1,
+            note: 1
+          }
+        }
       ])
       .toArray();
 
@@ -175,6 +200,7 @@ app.get("/featured-foods", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch featured foods" });
   }
 });
+
 
 app.get("/available-foods", async (req, res) => {
   try {
